@@ -10,7 +10,7 @@ namespace CSharpLib
 {
     public class MALabLib
     {
-        private const string USER_AGENT = "BitBaan-API-Sample-VBNet";
+        private const string USER_AGENT = "BitBaan-API-Sample-CSharp";
 
         private string server_address;
         JObject unknownerror_respone_json;
