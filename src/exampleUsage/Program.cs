@@ -14,19 +14,19 @@ namespace CSharpLib
             Console.Write("|  _ \\| | __|  _ \\ / _` |/ _` | '_ \\  | |\\/| | / _ \\ | |   / _` | '_ \\ \r\n");
             Console.Write("| |_) | | |_| |_) | (_| | (_| | | | | | |  | |/ ___ \\| |__| (_| | |_) |\r\n");
             Console.Write("|____/|_|\\__|____/ \\__,_|\\__,_|_| |_| |_|  |_/_/   \\_\\_____\\__,_|_.__/ \r\n\r\n");
-            string email = "", password = "", serveraddress = "";
+            string identifier = "", password = "", serveraddress = "";
             string file_path = "";
             Console.Write("Please insert API server address [Default=https://apimalab.bitbaan.com]: ");
             serveraddress = Console.ReadLine();
             if(serveraddress == "")
                 serveraddress = "https://apimalab.bitbaan.com";
-            Console.Write("Please insert email address: ");
-            email = Console.ReadLine();
+            Console.Write("Please insert identifier (username, phone no or email): ");
+            identifier = Console.ReadLine();
             Console.Write("Please insert your password: ");
             password = Console.ReadLine();
             MALabLib malab = new MALabLib(serveraddress);
             JObject params1 = new JObject();
-            params1.Add("email", email);
+            params1.Add("identifier", identifier);
             params1.Add("password", password);
             JObject return_value = malab.call_with_json_input("user/login", params1);
             if (return_value.SelectToken("success").ToObject<bool>() == true)
