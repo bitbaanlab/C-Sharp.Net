@@ -40,7 +40,7 @@ namespace CSharpLib
 
         public String get_error(JObject return_value)
         {
-            String error = "";
+            String error = "Error!\n";
             if (return_value.ContainsKey("error_code"))
                 error += ("Error code: " + return_value.SelectToken("error_code").ToObject<string>() + "\n");
             if (return_value.ContainsKey("error_desc"))
