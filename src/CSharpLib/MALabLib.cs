@@ -1,12 +1,10 @@
 ﻿using Newtonsoft.Json.Linq;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace CSharpLib
 {
@@ -15,13 +13,11 @@ namespace CSharpLib
         private const string USER_AGENT = "BitBaan-API-Sample-VBNet";
 
         private string server_address;
-        private string api_key;
         JObject unknownerror_respone_json;
 
-        public MALabLib(string server_address, string api_key = "")
+        public MALabLib(string server_address)
         {
             this.server_address = server_address;
-            this.api_key = api_key;
 
             this.unknownerror_respone_json = new JObject();
             this.unknownerror_respone_json.Add("error_code", 900);
@@ -42,17 +38,47 @@ namespace CSharpLib
             }
         }
 
-        private JObject call_api_with_json_input(string api, JObject json_input) {
-            HttpWebRequest HttpWebRequest = (HttpWebRequest)WebRequest.Create(this.server_address + "/" + api);
+        public String get_error(JObject return_value)
+        {
+            String error = "Error!\n";
+            if (return_value.ContainsKey("error_code"))
+                error += ("Error code: " + return_value.SelectToken("error_code").ToObject<string>() + "\n");
+            if (return_value.ContainsKey("error_desc"))
+                error += ("Error description: " + return_value.SelectToken("error_desc").ToObject<string>() + "\n");
+            if (return_value.ContainsKey("error_details_code"))
+                error += ("Error details code: " + return_value.SelectToken("error_details_code").ToObject<string>() + "\n");
+            if (return_value.ContainsKey("error_details_desc"))
+                error += ("Error details description: " + return_value.SelectToken("error_details_desc").ToObject<string>() + "\n");
+            if (return_value.ContainsKey("status_code"))
+            {
+                error += ("Status code: " + return_value.SelectToken("status_code").ToObject<string>() + "\n");
+                if (return_value.SelectToken("status_code").ToObject<int>() == 422 && return_value.ContainsKey("error"))
+                {
+                    foreach (JProperty current_key in return_value.SelectToken("error"))
+                        error += ("Validation in: " + current_key.Name + ", [" + current_key.Value.ToArray()[0].ToString() + "]\n");
+                }
+            }
+            return error;
+        }
+
+        public JObject call_with_json_input(string api, JObject json_input) {
+            HttpWebRequest HttpWebRequest = (HttpWebRequest)WebRequest.Create(this.server_address + "/malab/v1/" + api);
             HttpWebRequest.ContentType = "application/json";
             HttpWebRequest.Method = "POST";
             HttpWebRequest.UserAgent = USER_AGENT;
-            using (var streamWriter = new StreamWriter(HttpWebRequest.GetRequestStream()))
+            try
             {
-                string parsedContent = json_input.ToString();
-                streamWriter.Write(parsedContent);
-                streamWriter.Flush();
-                streamWriter.Close();
+                using (var streamWriter = new StreamWriter(HttpWebRequest.GetRequestStream()))
+                {
+                    string parsedContent = json_input.ToString();
+                    streamWriter.Write(parsedContent);
+                    streamWriter.Flush();
+                    streamWriter.Close();
+                }
+            }
+            catch (Exception)
+            {
+                return unknownerror_respone_json;
             }
             string result;
             try
@@ -83,10 +109,10 @@ namespace CSharpLib
             }
         }
 
-        private JObject call_api_with_form_input(string api, JObject data_input, string file_param_name, string file_path) {
+        public JObject call_with_form_input(string api, JObject data_input, string file_param_name, string file_path) {
             string boundary = "---------------------------" + DateTime.Now.Ticks.ToString("x");
             byte[] boundarybytes = System.Text.Encoding.ASCII.GetBytes("\r\n--" + boundary + "\r\n");
-            HttpWebRequest wr = (HttpWebRequest)WebRequest.Create(this.server_address + "/" + api);
+            HttpWebRequest wr = (HttpWebRequest)WebRequest.Create(this.server_address + "/malab/v1/" + api);
             wr.ContentType = "multipart/form-data; boundary=" + boundary;
             wr.Method = "POST";
             wr.KeepAlive = true;
@@ -153,185 +179,5 @@ namespace CSharpLib
                 return unknownerror_respone_json;
             }
         }
-
-        public JObject login(string email, string password)
-        {
-            JObject j_params = new JObject();
-            j_params.Add("email", email);
-            j_params.Add("password", password);
-            JObject retValue = call_api_with_json_input("api/v1/user/login", j_params);
-            if (retValue.SelectToken("success").ToObject<bool>() == true)
-                this.api_key = retValue.SelectToken("apikey").ToObject<string>();
-            return retValue;
-        }
-
-        public JObject scan(string file_path, string file_name, bool is_private = false, string file_origin = "")
-        {
-            JObject j_params = new JObject();
-            j_params.Add("filename", file_name);
-            j_params.Add("apikey", this.api_key);
-            if (is_private == true)
-                j_params.Add("is_private", true);
-            if (file_origin.Length != 0)
-                j_params.Add("fileorigin", file_origin);
-            return call_api_with_form_input("api/v1/scan", j_params, "filedata", file_path);
-        }
-
-        public JObject rescan(string file_sha256)
-        {
-            JObject j_params = new JObject();
-            j_params.Add("apikey", this.api_key);
-            j_params.Add("sha256", file_sha256);
-            return call_api_with_json_input("api/v1/rescan", j_params);
-        }
-
-        public JObject results(string file_sha256, int scan_id)
-        {
-            JObject j_params = new JObject();
-            j_params.Add("apikey", this.api_key);
-            j_params.Add("sha256", file_sha256);
-            j_params.Add("scan_id", scan_id);
-            return call_api_with_json_input("api/v1/search/scan/results", j_params);
-        }
-
-        public JObject search_by_hash(string hash, int ot = 0, int ob = 0, int page = 0, int per_page = 0)
-        {
-            JObject j_params = new JObject();
-            j_params.Add("apikey", this.api_key);
-            j_params.Add("hash", hash);
-            if (ot != 0)
-                j_params.Add("ot", ot);
-            if (ob != 0)
-                j_params.Add("ob", ob);
-            if (page != 0)
-                j_params.Add("page", page);
-            if (per_page != 0)
-                j_params.Add("per_page", per_page);
-            return call_api_with_json_input("api/v1/search/scan/hash", j_params);
-        }
-
-        public JObject search_by_malware_name(string malware_name, int ot = 0, int ob = 0, int page = 0, int per_page = 0)
-        {
-            JObject j_params = new JObject();
-            j_params.Add("apikey", this.api_key);
-            j_params.Add("malware_name", malware_name);
-            if (ot != 0)
-                j_params.Add("ot", ot);
-            if (ob != 0)
-                j_params.Add("ob", ob);
-            if (page != 0)
-                j_params.Add("page", page);
-            if (per_page != 0)
-                j_params.Add("per_page", per_page);
-            return call_api_with_json_input("api/v1/search/scan/malware-name", j_params);
-        }
-
-        public JObject download_file(string hash_value)
-        {
-            JObject j_params = new JObject();
-            j_params.Add("apikey", this.api_key);
-            j_params.Add("hash", hash_value);
-            return call_api_with_json_input("api/v1/file/download", j_params);
-        }
-
-        public JObject get_comments(string sha256, int page = 0, int per_page = 0)
-        {
-            JObject j_params = new JObject();
-            j_params.Add("apikey", this.api_key);
-            j_params.Add("sha256", sha256);
-            if (page != 0)
-                j_params.Add("page", page);
-            if (per_page != 0)
-                j_params.Add("per_page", per_page);
-            return call_api_with_json_input("api/v1/comment", j_params);
-        }
-
-        public JObject add_comment(string sha256, string description)
-        {
-            JObject j_params = new JObject();
-            j_params.Add("apikey", this.api_key);
-            j_params.Add("sha256", sha256);
-            j_params.Add("description", description);
-            return call_api_with_json_input("api/v1/comment/add", j_params);
-        }
-
-        public JObject edit_comment(int comment_id, string new_description)
-        {
-            JObject j_params = new JObject();
-            j_params.Add("apikey", this.api_key);
-            j_params.Add("comment_id", comment_id);
-            j_params.Add("description", new_description);
-            return call_api_with_json_input("api/v1/comment/edit", j_params);
-        }
-
-        public JObject delete_comment(int comment_id)
-        {
-            JObject j_params = new JObject();
-            j_params.Add("apikey", this.api_key);
-            j_params.Add("comment_id", comment_id);
-            return call_api_with_json_input("api/v1/comment/delete", j_params);
-        }
-
-        public JObject approve_comment(int comment_id)
-        {
-            JObject j_params = new JObject();
-            j_params.Add("apikey", this.api_key);
-            j_params.Add("comment_id", comment_id);
-            return call_api_with_json_input("api/v1/comment/approve", j_params);
-        }
-
-        public JObject get_captcha()
-        {
-            JObject j_params = new JObject();
-            return call_api_with_json_input("api/v1/captcha", j_params);
-        }
-
-        public JObject register(string first_name, string last_name, string username, string email, string password, string captcha)
-        {
-            JObject j_params = new JObject();
-            j_params.Add("firstname", first_name);
-            j_params.Add("lastname", last_name);
-            j_params.Add("username", username);
-            j_params.Add("email", email);
-            j_params.Add("password", password);
-            j_params.Add("captcha", captcha);
-            return call_api_with_json_input("api/v1/user/register", j_params);
-        }
-
-        public JObject advanced_search(int scan_id = 0, string file_name = "", string malware_name = "", string hash = "", string origin = "", string analyzed = "", string has_origin = "", int ot = 0, int ob = 0, int page = 0,int per_page = 0)
-        {
-            JObject j_params = new JObject();
-            j_params.Add("apikey", this.api_key);
-            if (scan_id != 0)
-                j_params.Add("scan_id", scan_id);
-            if (file_name.Length != 0)
-                j_params.Add("filename", file_name);
-            if (malware_name.Length != 0)
-                j_params.Add("malware_name", malware_name);
-            if (hash.Length != 0)
-                j_params.Add("hash", hash);
-            if (origin.Length != 0)
-                j_params.Add("origin", origin);
-            if (analyzed.Length != 0)
-                j_params.Add("analyzed", analyzed);
-            if (has_origin.Length != 0)
-                j_params.Add("has_origin", has_origin);
-            if (ot != 0)
-                j_params.Add("ot", ot);
-            if (ob != 0)
-                j_params.Add("ob", ob);
-            if (page != 0)
-                j_params.Add("page", page);
-            if (per_page != 0)
-                j_params.Add("per_page", per_page);
-            return call_api_with_json_input("api/v1/search/scan/advanced", j_params);
-        }
-
-        public JObject get_av_list() {
-            JObject j_params = new JObject();
-            j_params.Add("apikey", this.api_key);
-            return call_api_with_json_input("api/v1/search/av_list", j_params);
-        }
-
     }
 }
